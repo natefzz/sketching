@@ -1,9 +1,12 @@
 import { resolve } from "path";
+import { fileURLToPath } from "url";
+import { dirname } from "path";
+import { defineConfig } from "vite";
 
-/**
- * @type {import('vite').UserConfig}
- */
-const config = {
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = dirname(__filename);
+
+export default defineConfig({
   build: {
     minify: "esbuild",
     rollupOptions: {
@@ -15,6 +18,4 @@ const config = {
       },
     },
   },
-};
-
-export default config;
+});

@@ -1,5 +1,19 @@
-export function generatePencilTextures(numTextures, width, height) {
-  const paper = new Paper(width, height);
+export function generatePencilTextures(numTextures, width, height, style = 'pencil') {
+  let paper;
+  switch(style) {
+    case 'charcoal':
+      paper = new CharcoalPaper(width, height);
+      break;
+    case 'ink':
+      paper = new InkPaper(width, height);
+      break;
+    case 'sketch':
+      paper = new SketchPaper(width, height);
+      break;
+    default:
+      paper = new Paper(width, height);
+  }
+
   const textures = new Uint8ClampedArray(4 * width * height * numTextures);
   let index = 0;
   for (let i = 0; i < numTextures; i++) {
@@ -94,6 +108,187 @@ class Paper {
       weight = 0.3;
     }
     let targetTotal = 255.0 * darkness * this.width * this.height;
+    for (let i = 0; i < maxNumStrokes; i++) {
+      this.drawStroke(weight);
+      if (this.total >= targetTotal) {
+        break;
+      }
+    }
+  }
+}
+
+// Charcoal Paper - grainy, blocky, no linear strokes
+class CharcoalPaper extends Paper {
+  constructor(width, height) {
+    super(width, height);
+    this.thickness = 2.5;  // Thick for blocky appearance
+    this.mu_b = 0.25;      // Much higher for darker marks
+  }
+
+  drawPixel(w, h, pressure) {
+    const pos = this.fromWH(w, h);
+    const oldValue = this.data[pos];
+    let intermediateValue = oldValue * pressure * 1.2;  // Multiply for darker effect
+    if (oldValue > 200) {
+      intermediateValue *= 0.9;  // Less aggressive threshold
+    }
+    const newValue = Math.round(oldValue - this.mu_b * intermediateValue);
+    this.data[pos] = newValue;
+    this.total += oldValue - newValue;
+  }
+
+  // Draw random scattered dots instead of strokes for grainy effect
+  drawBlob(pressure) {
+    // Random blob position
+    const centerW = Math.random() * this.width;
+    const centerH = Math.random() * this.height;
+
+    // Random blob size
+    const blobRadius = this.thickness * (0.6 + 0.5 * Math.random());
+    const numDots = Math.floor(blobRadius * 15);  // Even more dots per blob
+
+    for (let i = 0; i < numDots; i++) {
+      // Scatter dots around center
+      const angle = Math.random() * Math.PI * 2;
+      const distance = Math.random() * blobRadius;
+      const w = centerW + Math.cos(angle) * distance;
+      const h = centerH + Math.sin(angle) * distance;
+
+      // Variable pressure for each dot - higher pressure
+      const dotPressure = pressure * (0.8 + 0.6 * Math.random());
+      this.drawPoint(w, h, dotPressure);
+    }
+  }
+
+  drawTexture(darkness) {
+    // Use blobs instead of strokes
+    let weight = darkness * darkness * 1.3;  // Increase weight for darker result
+    // More blobs for visible coverage
+    let maxNumBlobs = Math.pow(1 / this.thickness, 2) * 85 * this.height;  // More blobs
+    if (weight < 0.3) {
+      maxNumBlobs = weight * (1.0 / 0.3) * maxNumBlobs;
+      weight = 0.3;
+    }
+    let targetTotal = 255.0 * darkness * this.width * this.height;
+    for (let i = 0; i < maxNumBlobs; i++) {
+      this.drawBlob(weight);
+      if (this.total >= targetTotal) {
+        break;
+      }
+    }
+  }
+}
+
+// Ink Paper - thin, sharp, high contrast strokes
+class InkPaper extends Paper {
+  constructor(width, height) {
+    super(width, height);
+    this.thickness = 0.35;  // Slightly thicker for performance
+    this.mu_b = 0.25;       // Very sharp, high contrast
+  }
+
+  drawPixel(w, h, pressure) {
+    const pos = this.fromWH(w, h);
+    const oldValue = this.data[pos];
+    // Higher contrast - more aggressive darkening
+    let intermediateValue = oldValue * pressure * 1.8;
+    if (oldValue > 230) {
+      intermediateValue *= 0.2;  // Very sharp threshold
+    }
+    const newValue = Math.round(oldValue - this.mu_b * intermediateValue);
+    this.data[pos] = Math.max(newValue, 0);
+    this.total += oldValue - newValue;
+  }
+
+  drawStroke(pressure) {
+    const numSteps = this.width * 1.5;  // Reduced for performance
+    const stepSize = 0.45;
+
+    let w = Math.random() * this.width;
+    let h = Math.random() * this.height;
+
+    for (let i = 0; i < numSteps; i++) {
+      const dw = 1 + 0.02 * Math.random();  // Less variation, straighter
+      const dh = 0.02 * Math.random();
+      w += stepSize * dw;
+      h += stepSize * dh;
+      this.drawPoint(w, h, pressure);
+    }
+  }
+
+  drawTexture(darkness) {
+    // Ink needs fewer strokes due to high contrast
+    let weight = darkness * darkness * 1.2;
+    let maxNumStrokes = Math.pow(1 / this.thickness, 2) * 60 * this.height;  // Reduced multiplier
+    if (weight < 0.35) {
+      maxNumStrokes = weight * (1.0 / 0.35) * maxNumStrokes;
+      weight = 0.35;
+    }
+    let targetTotal = 255.0 * darkness * this.width * this.height;
+    for (let i = 0; i < maxNumStrokes; i++) {
+      this.drawStroke(weight);
+      if (this.total >= targetTotal) {
+        break;
+      }
+    }
+  }
+}
+
+// Sketch Paper - loose, light, hand-drawn draft style
+class SketchPaper extends Paper {
+  constructor(width, height) {
+    super(width, height);
+    this.thickness = 0.35;  // Thinner for more sketchy lines
+    this.mu_b = 0.09;       // Increased for more visible strokes
+  }
+
+  drawPixel(w, h, pressure) {
+    const pos = this.fromWH(w, h);
+    const oldValue = this.data[pos];
+    let intermediateValue = oldValue * pressure * 0.75;  // More visible
+    if (oldValue > 235) {
+      intermediateValue *= 0.65;  // Less extreme on white areas
+    }
+    const newValue = Math.round(oldValue - this.mu_b * intermediateValue);
+    this.data[pos] = newValue;
+    this.total += oldValue - newValue;
+  }
+
+  drawStroke(pressure) {
+    // Shorter, erratic strokes for sketchy feel
+    const numSteps = this.width * 0.6;  // Slightly longer than before
+    const stepSize = 0.6;
+
+    let w = Math.random() * this.width;
+    let h = Math.random() * this.height;
+
+    for (let i = 0; i < numSteps; i++) {
+      // Strong randomness for messy, hand-drawn feel
+      const dw = 1 + 0.3 * (Math.random() - 0.5);  // Can go backwards significantly
+      const dh = 0.3 * (Math.random() - 0.5);
+      w += stepSize * dw;
+      h += stepSize * dh;
+
+      // Highly variable pressure for sketchy appearance
+      const sketchyPressure = pressure * (0.4 + 0.9 * Math.random());
+
+      // Skip some points for broken, sketchy lines
+      if (Math.random() > 0.2) {  // Skip 20% of points
+        this.drawPoint(w, h, sketchyPressure);
+      }
+    }
+  }
+
+  drawTexture(darkness) {
+    // Fewer strokes for sparse, sketchy appearance but not too few
+    let weight = darkness * darkness * 0.85;
+    let maxNumStrokes = Math.pow(1 / this.thickness, 2) * 50 * this.height;  // Increased from 40
+    if (weight < 0.3) {
+      maxNumStrokes = weight * (1.0 / 0.3) * maxNumStrokes;
+      weight = 0.3;
+    }
+    // Lighter overall for sketch style but visible
+    let targetTotal = 255.0 * darkness * 0.75 * this.width * this.height;  // Increased from 0.7
     for (let i = 0; i < maxNumStrokes; i++) {
       this.drawStroke(weight);
       if (this.total >= targetTotal) {

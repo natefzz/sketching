@@ -234,20 +234,22 @@ class InkPaper extends Paper {
   }
 }
 
-// Sketch Paper - loose, light, hand-drawn draft style
+// Sketch Paper - flowing, artistic, hand-drawn style like the horse example
 class SketchPaper extends Paper {
   constructor(width, height) {
     super(width, height);
-    this.thickness = 0.35;  // Thinner for more sketchy lines
-    this.mu_b = 0.09;       // Increased for more visible strokes
+    this.thickness = 0.8;    // Much thicker for visible, bold strokes
+    this.mu_b = 0.12;        // Higher for darker, more visible lines
   }
 
   drawPixel(w, h, pressure) {
     const pos = this.fromWH(w, h);
     const oldValue = this.data[pos];
-    let intermediateValue = oldValue * pressure * 0.75;  // More visible
-    if (oldValue > 235) {
-      intermediateValue *= 0.65;  // Less extreme on white areas
+    let intermediateValue = oldValue * pressure * 0.9;  // Stronger application for visibility
+    if (oldValue > 230) {
+      intermediateValue *= 0.6;  // Keep highlights bright
+    } else if (oldValue > 200) {
+      intermediateValue *= 0.8;  // Gentle transition
     }
     const newValue = Math.round(oldValue - this.mu_b * intermediateValue);
     this.data[pos] = newValue;
@@ -255,40 +257,52 @@ class SketchPaper extends Paper {
   }
 
   drawStroke(pressure) {
-    // Shorter, erratic strokes for sketchy feel
-    const numSteps = this.width * 0.6;  // Slightly longer than before
-    const stepSize = 0.6;
+    // Very long, flowing strokes for bold sketch lines
+    const numSteps = this.width * 2.5;  // Much longer strokes
+    const stepSize = 0.6;  // Larger steps for longer lines
 
     let w = Math.random() * this.width;
     let h = Math.random() * this.height;
 
+    // Start with a random direction
+    let angle = Math.random() * Math.PI * 2;
+    let angleVelocity = 0;
+
     for (let i = 0; i < numSteps; i++) {
-      // Strong randomness for messy, hand-drawn feel
-      const dw = 1 + 0.3 * (Math.random() - 0.5);  // Can go backwards significantly
-      const dh = 0.3 * (Math.random() - 0.5);
+      // Smooth, flowing angle changes (like hand movement)
+      angleVelocity += (Math.random() - 0.5) * 0.08;  // Less variation for straighter lines
+      angleVelocity *= 0.96;  // More damping for smoother curves
+      angle += angleVelocity;
+
+      const dw = Math.cos(angle);
+      const dh = Math.sin(angle);
+
       w += stepSize * dw;
       h += stepSize * dh;
 
-      // Highly variable pressure for sketchy appearance
-      const sketchyPressure = pressure * (0.4 + 0.9 * Math.random());
+      // Variable pressure that changes smoothly along the stroke
+      const progress = i / numSteps;
+      const pressureCurve = Math.sin(progress * Math.PI);  // Lighter at ends
+      const pressureNoise = 0.8 + 0.2 * Math.random();  // Less variation for consistency
+      const sketchyPressure = pressure * pressureCurve * pressureNoise;
 
-      // Skip some points for broken, sketchy lines
-      if (Math.random() > 0.2) {  // Skip 20% of points
+      // Draw most points for continuous, bold lines
+      if (Math.random() > 0.05) {  // Skip only 5% for very continuous lines
         this.drawPoint(w, h, sketchyPressure);
       }
     }
   }
 
   drawTexture(darkness) {
-    // Fewer strokes for sparse, sketchy appearance but not too few
-    let weight = darkness * darkness * 0.85;
-    let maxNumStrokes = Math.pow(1 / this.thickness, 2) * 50 * this.height;  // Increased from 40
-    if (weight < 0.3) {
-      maxNumStrokes = weight * (1.0 / 0.3) * maxNumStrokes;
-      weight = 0.3;
+    // Fewer strokes for less dense, more visible individual lines
+    let weight = darkness * darkness * 1.0;  // Higher weight for darker lines
+    let maxNumStrokes = Math.pow(1 / this.thickness, 2) * 35 * this.height;  // Much fewer strokes
+    if (weight < 0.25) {
+      maxNumStrokes = weight * (1.0 / 0.25) * maxNumStrokes;
+      weight = 0.25;
     }
-    // Lighter overall for sketch style but visible
-    let targetTotal = 255.0 * darkness * 0.75 * this.width * this.height;  // Increased from 0.7
+    // Lower target for sparser coverage
+    let targetTotal = 255.0 * darkness * 0.6 * this.width * this.height;
     for (let i = 0; i < maxNumStrokes; i++) {
       this.drawStroke(weight);
       if (this.total >= targetTotal) {

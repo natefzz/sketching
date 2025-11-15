@@ -90,32 +90,28 @@ vec3 applyInk(vec3 baseColor) {
     return vec3(intensity);
 }
 
-// Apply sketch effect - loose, light, hand-drawn
+// Apply sketch effect - artistic, flowing, like the horse example
 vec3 applySketch(vec3 baseColor) {
-    // Darken slightly to reduce white reflections
+    // Slight darkening to enhance depth while keeping it light
     baseColor = baseColor * 0.92;
 
-    // Multi-scale smooth noise for irregular sketch texture - reduced intensity
-    float noise1 = noise(gl_FragCoord.xy * 0.04) * 0.10;
-    float noise2 = noise(gl_FragCoord.xy * 0.08) * 0.08;
-    float noise3 = noise(gl_FragCoord.xy * 0.16) * 0.06;
-    baseColor = baseColor + vec3(noise1 + noise2 + noise3);
+    // Soft, flowing noise patterns for organic feel
+    float flowNoise1 = noise(gl_FragCoord.xy * 0.04) * 0.06;
+    float flowNoise2 = noise(gl_FragCoord.xy * 0.08) * 0.04;
+    baseColor = baseColor + vec3(flowNoise1 + flowNoise2);
 
-    // Paper grain texture - reduced
-    float paperGrain = noise(gl_FragCoord.xy * 0.25) * 0.08;
-    baseColor = baseColor + vec3(paperGrain);
+    // Paper texture for traditional sketch feel
+    float paperTexture = noise(gl_FragCoord.xy * 0.25) * 0.05;
+    baseColor = baseColor + vec3(paperTexture);
 
-    // Irregular sketchy texture - reduced
-    float sketchBlock1 = noise(gl_FragCoord.xy * 0.03) * 0.09;
-    float sketchBlock2 = noise(gl_FragCoord.xy * 0.06) * 0.06;
-    baseColor = baseColor + vec3(sketchBlock1 + sketchBlock2);
-
-    // Fine texture - reduced
-    float fineTexture = noise(gl_FragCoord.xy * 0.35) * 0.05;
-    baseColor = baseColor + vec3(fineTexture);
-
-    // Minimal contrast adjustment
+    // Gentle contrast adjustment for softer look
     baseColor = pow(baseColor, vec3(0.95));
+
+    // Add subtle directional texture (mimicking pencil strokes)
+    float angle = noise(gl_FragCoord.xy * 0.02) * 6.28;
+    vec2 strokeDir = vec2(cos(angle), sin(angle));
+    float strokePattern = abs(sin(dot(gl_FragCoord.xy, strokeDir) * 0.3)) * 0.03;
+    baseColor = baseColor + vec3(strokePattern);
 
     return clamp(baseColor, 0.0, 1.0);
 }
@@ -136,18 +132,18 @@ void main() {
     vec3 finalColor = baseColor;
 
     if (styleMode == 1) {
-        // Charcoal
+        // Charcoal - softer edges for natural look
         finalColor = applyCharcoal(baseColor);
-        finalColor = mix(vec3(0.2), finalColor, cartoonEdge);
+        finalColor = mix(vec3(0.5), finalColor, cartoonEdge);
     } else if (styleMode == 2) {
         // Ink
         finalColor = applyInk(baseColor);
         finalColor = mix(vec3(0.1), finalColor, cartoonEdge);
     } else if (styleMode == 3) {
-        // Sketch - very soft edges, minimal outline
+        // Sketch - soft, artistic edges like the horse example
         finalColor = applySketch(baseColor);
-        // Very light edge color, almost no outline
-        finalColor = mix(vec3(0.75), finalColor, cartoonEdge);
+        // Soft gray edges that blend naturally (not black)
+        finalColor = mix(vec3(0.65), finalColor, cartoonEdge);
     } else {
         // Pencil (default)
         finalColor = mix(vec3(0.3), baseColor, cartoonEdge);

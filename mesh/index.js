@@ -227,7 +227,12 @@ const draw = regl({
     pencilTextures: () => pencilTextures,
     styleMode: () => {
       // Convert style string to integer for shader
-      const styleMap = { pencil: 0, charcoal: 1, ink: 2, sketch: 3 };
+      const styleMap = {
+        pencil: 0,
+        charcoal: 1,
+        ink: 2,
+        sketch: 3
+      };
       return styleMap[params.style] || 0;
     },
   },
